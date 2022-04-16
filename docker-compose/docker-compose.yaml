@@ -1,0 +1,75 @@
+version: '3'
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    volumes:
+      - /home/neptun/home_assistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+  esphome:
+    container_name: esphome
+    image: esphome/esphome
+    volumes:
+      - /home/neptun/home_assistant/esphome/config:/config
+      - /etc/localtime:/etc/localtime:ro
+    restart: always
+    privileged: true
+    network_mode: host
+    depends_on:
+      - "homeassistant"
+  influxdb:
+    container_name: influxdb
+    image: influxdb
+    volumes:
+      - /home/neptun/home_assistant/influxdb/:/var/lib/influxdb
+    ports:
+      - 8086:8086
+      - 8083:8083
+    restart: always
+    depends_on:
+      - "homeassistant"
+    network_mode: "bridge"
+  grafana:
+    container_name: grafana
+    image: grafana/grafana
+    volumes:
+      - /home/neptun/home_assistant/grafana:/var/lib/grafana
+    ports:
+      - 3000:3000
+    restart: always
+    user: "1000"
+    depends_on:
+      - "homeassistant"
+  telegraf:
+    image: telegraf
+    container_name: telegraf
+    restart: always
+    network_mode: host
+    environment:
+      INFLUX_TOKEN: token
+      HOST_PROC: /rootfs/proc
+      HOST_SYS: /rootfs/sys
+      HOST_ETC: /rootfs/etc
+    volumes:
+     - /home/neptun/home_assistant/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+     - /sys:/rootfs/sys:ro
+     - /proc:/rootfs/proc:ro
+     - /etc:/rootfs/etc:ro
+    depends_on:
+     - influxdb
+  tailscaled:
+    image: tailscale/tailscale
+    container_name: tailscaled
+    restart: always
+    network_mode: host
+    privileged: true
+    command: tailscaled
+    volumes:
+     - /home/neptun/home_assistant/tailscale:/var/lib
+     - /dev/net/tun:/dev/net/tun
+
+
